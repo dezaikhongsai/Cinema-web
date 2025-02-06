@@ -1,6 +1,8 @@
 import { useState , useEffect } from "react";
 import Search from "./components/Search";
 import MovieCard from "./components/MovieCard";
+import { useDebounce } from 'react-use';
+import { updateSearchCount } from "./appwrite";
 const API_BASE_URL = 'https://api.themoviedb.org/3/discover/movie?include_adult=false&include_video=false&language=en-US&page=1&sort_by=popularity.desc';
 // const API_KEY = import.meta.env.VITE_TDMB_API_KEY
 
@@ -17,13 +19,17 @@ function App() {
   const [errorMessage, setErrorMessage] = useState('');
   const [movieList, setMovieList] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [debouncedSearchTerm , setDebouncedSearchTerm] = useState('')
+  useDebounce(() => setDebouncedSearchTerm(searchTerm) , 500 , [searchTerm] )  
 
-
-  const fetchMovies = async () => {
+  const fetchMovies = async (query = '') => {
     setIsLoading(true);
     try {
-      const endpoint = `${API_BASE_URL}`;
+       const endpoint = query
+      ? `https://api.themoviedb.org/3/search/movie?query=${encodeURIComponent(query)}&language=en-US&page=1`
+      : API_BASE_URL;
       const response = await fetch(endpoint, API_OPTIONS);
+      console.log(query)
       if (!response.ok) {
         throw new Error('Failed to fetch movies');
       }
@@ -34,6 +40,9 @@ function App() {
         return;
       }
       setMovieList(data.results || []);
+      if (query && data.results.length > 0) {
+        await updateSearchCount(query , data.results[0])
+      }
       console.log(data);
     }
     catch (error) {
@@ -44,8 +53,9 @@ function App() {
     }
   }
   useEffect(() => {
-    fetchMovies();
-  }, []); 
+    fetchMovies(debouncedSearchTerm);
+  }, [debouncedSearchTerm]); 
+  
   return (
     <main>
       <div className="pattern"></div>
